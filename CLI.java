@@ -1,144 +1,197 @@
-import java.io.*;
-import java.nio.file.Files;
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.Scanner;
 
-public class CommandLineInterpreter {
+public class CLI {
 
-    private static File currentDirectory;
+    Path currentDir;
 
-    public CommandLineInterpreter() {
-        currentDirectory = new File(System.getProperty("user.home"));
+    public CLI()
+    {
+        currentDir= Paths.get("").toAbsolutePath();// Start in the current directory
     }
 
-    public File getCurrentDirectory() {
-        return currentDirectory;
+
+    //pwd - Print Working Directory
+    // Displays the current working directory path.
+    public void pwd()
+    {
+        System.out.println(currentDir.toAbsolutePath()); // retrieves the absolute path of the currentDirectory.
     }
-###########################################################################################################
-  #AyaEssam
-    public void mkdir(String dirName, OutputStream output) throws IOException {
-        if (dirName == null || dirName.isEmpty()) {
-            output.write("Usage: mkdir <directoryName>\n".getBytes());
+
+    //cd<directory>Change Directory
+    // Changes the working directory to the specified directory.
+    public void cd(String[] dir)
+    {
+        if(dir.length==0)
+        {
+            System.out.println("cd:missing Directory");
             return;
         }
-        File dir = new File(currentDirectory, dirName);
-        if (dir.exists()) {
-            output.write(("Directory already exists: " + dirName + "\n").getBytes());
-        } else if (dir.mkdirs()) {
-            output.write(("Directory created: " + dirName + "\n").getBytes());
-        } else {
-            output.write(("Failed to create directory: " + dirName + "\n").getBytes());
+        // Resolve the new path relative to the current directory and normalize it (clean up any redundant parts)
+        Path NewPath=currentDir.resolve(dir[0]).normalize();
+        // Convert the Path object to a File object to check if it exists and is a directory
+        File Directory = NewPath.toFile();
+
+        if(Directory.exists()&&Directory.isDirectory())
+        {
+            currentDir=NewPath;// Update the current directory to the new path
         }
+        else
+        {
+            System.out.println("cd:directory does not exist");
+        }
+
     }
 
-    public void rmdir(String dirName, OutputStream output) throws IOException {
-        if (dirName == null || dirName.isEmpty()) {
-            output.write("Usage: rmdir <directoryName>\n".getBytes());
+    //ls - List Directory Contents
+    // Lists the non-hidden files in the current directory in alphabetical order.
+    public void ls()
+    {
+        File Dir=currentDir.toFile();
+        String[] files=Dir.list();
+
+        if(files==null){
+            System.out.println("ls:missing Files"+currentDir);
             return;
         }
-        File dir = new File(currentDirectory, dirName);
-        if (!dir.exists()) {
-            output.write(("Directory not found: " + dirName + "\n").getBytes());
-        } else if (!dir.isDirectory()) {
-            output.write((dirName + " is not a directory\n").getBytes());
-        } else if (dir.delete()) {
-            output.write(("Directory deleted: " + dirName + "\n").getBytes());
-        } else {
-            output.write(("Failed to delete directory: " + dirName + "\n").getBytes());
-        }
-    }
-
-    public void mv(String sourceFileName, String destinationFileName, OutputStream output) throws IOException {
-        assert sourceFileName != null && !sourceFileName.isEmpty() : "Source file name is null or empty";
-        assert destinationFileName != null && !destinationFileName.isEmpty() : "Destination file name is null or empty";
-
-        File sourceFile = new File(currentDirectory, sourceFileName);
-        File destinationFile = new File(currentDirectory, destinationFileName);
-
-        assert sourceFile.exists() : "Source file not found: " + sourceFileName;
-        assert !destinationFile.exists() : "Destination file already exists: " + destinationFileName;
-
-        if (sourceFile.equals(destinationFile)) {
-            output.write(("Source and destination are the same, no action needed.\n").getBytes());
-        } else {
-            if (sourceFile.getAbsolutePath().equals(destinationFile.getAbsolutePath())) {
-                assert sourceFile.renameTo(destinationFile) : "Failed to rename " + sourceFileName + " to " + destinationFileName;
-                output.write(("Renamed " + sourceFileName + " to " + destinationFileName + "\n").getBytes());
-            } else {
-                File destinationDir = new File(destinationFile.getParent());
-                assert destinationDir.exists() : "Destination directory does not exist: " + destinationFile.getParent();
-                assert sourceFile.renameTo(destinationFile) : "Failed to move " + sourceFileName + " to " + destinationFileName;
-                output.write(("Moved " + sourceFileName + " to " + destinationFileName + "\n").getBytes());
+        Arrays.sort(files);
+        for (String file : files) {
+            if(!file.startsWith(".")){//checks whether the file name starts with a dot (.). In Unix-based systems (Linux, macOS), files that start with a dot are considered "hidden files."
+                System.out.println(file);
             }
         }
+
     }
 
-    public void rm(String fileName, OutputStream output) throws IOException {
-        if (fileName == null || fileName.isEmpty()) {
-            output.write("Usage: rm <fileName>\n".getBytes());
+   // ls-a -List All Directory Contents (including hidden files)
+    // Lists all files in the current directory, including hidden files, in alphabetical order.
+  public void lsA()
+   {
+        File Dir=currentDir.toFile();
+        String[] files=Dir.list();
+
+        if(files==null){
+            System.out.println("lsA:missing Files"+currentDir);
             return;
         }
-        File file = new File(currentDirectory, fileName);
-        if (!file.exists()) {
-            output.write(("File not found: " + fileName + "\n").getBytes());
-        } else if (!file.isFile()) {
-            output.write((fileName + " is not a file\n").getBytes());
-        } else if (file.delete()) {
-            output.write(("File deleted: " + fileName + "\n").getBytes());
-        } else {
-            output.write(("Failed to delete file: " + fileName + "\n").getBytes());
+        Arrays.sort(files);
+        for (String file : files) {
+            System.out.println(file); // Include hidden files
         }
+   }
+
+   //ls-r - List Directory Contents in Reverse Order.]
+    //Lists the non-hidden files in the current directory in reverse alphabetical order.
+    public void lsR()
+    {
+       File Dir=currentDir.toFile();
+       String[] files=Dir.list();
+
+       if(files==null){
+           System.out.println("lsR:missing Files"+currentDir);
+           return;
+       }
+
+       Arrays.sort(files, Collections.reverseOrder());
+       for (String file : files) {
+           if(!file.startsWith(".")){ // Exclude hidden files
+               System.out.println(file);
+           }
+       }
     }
 
-    public void executeCommand(String commandLine) throws IOException {
-        String[] commandParts = commandLine.split("\\s+");
-        String command = commandParts[0];
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-        switch (command) {
-            case "mkdir":
-                mkdir(commandParts.length > 1 ? commandParts[1] : null, outputStream);
+    public void executeCommand(String command) {
+        //command.trim() removes any leading or trailing whitespace from the command string.
+        //split("\\s+") splits the command string into an array of substrings using one or more spaces as the delimiter.
+        String[] cmd = command.trim().split("\\s+");
+        String mainCommand=cmd[0];
+        String[] args = Arrays.copyOfRange(cmd, 1, cmd.length);
+
+        switch (mainCommand) {
+            case "pwd":
+                pwd();
                 break;
-            case "rmdir":
-                rmdir(commandParts.length > 1 ? commandParts[1] : null, outputStream);
+            case "cd":
+                cd(args);
                 break;
-            case "mv":
-                if (commandParts.length > 2) {
-                    mv(commandParts[1], commandParts[2], outputStream);
+            case "ls":
+                if (args.length == 0) {
+                    ls();
                 } else {
-                    outputStream.write("Usage: mv <source> <destination>\n".getBytes());
+                    System.out.println("ls: invalid arguments");
                 }
                 break;
-            case "rm":
-                rm(commandParts.length > 1 ? commandParts[1] : null, outputStream);
+            case "ls-a":
+                if (args.length == 0) {
+                    lsA();
+                } else {
+                    System.out.println("ls-a: invalid arguments");
+                }
+                break;
+            case "ls-r":
+                if (args.length == 0) {
+                    lsR();
+                } else {
+                    System.out.println("ls-r: invalid arguments");
+                }
                 break;
             case "help":
-                help();
+                help(); // Display help message
+                break;
+            case "exit":
+                exit(); // Exit the CLI
                 break;
             default:
-                outputStream.write(("Unknown command: " + command + "\n").getBytes());
-                break;
+                System.out.println("Unknown command: " + mainCommand);
         }
-
-        System.out.write(outputStream.toByteArray());
     }
 
-    public static void main(String[] args) throws IOException {
-        CommandLineInterpreter cli = new CommandLineInterpreter();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
-        System.out.println("Welcome to Command Line Interpreter. Type 'exit' to quit.");
-        String commandLine;
+        public static void help () {
+            // Display list of available commands
+            System.out.println("Available commands:");
+            System.out.println("    pwd           | - Print the current directory.");
+            System.out.println("    cd <dir>      | - Change directory to <dir>.");
+            System.out.println("    mkdir <dir>   | - Create a new directory named <dir>.");
+            System.out.println("    rmdir <dir>   | - Remove the directory named <dir>.");
+            System.out.println("    ls -a -r      | - List files in the current directory (-a for all files and -r for reverse).");
+            System.out.println("    touch <file>  | - Create a file named <file>.");
+            System.out.println("    mv <src> <dst>| - Move or rename file from <src> to <dst>.");
+            System.out.println("    rm <file>     | - Remove file from <file>.");
+            System.out.println("    cat <file>    | - Display the contents of a <file>.");
+            System.out.println("    > <file>      | - Redirect output to <file> (overwrite).");
+            System.out.println("    >> <file>     | - Append output to <file>.");
+            System.out.println("    |             | - Pipe output of one file to another.");
+            System.out.println("    exit          | - Exit the CLI.");
+            System.out.println("    help          | - Display this help message.");
+        }
+        public static void exit () {
+            // Exit the Command Line Interpreter
+            System.out.println("Exiting the CLI, see you later :)");
+            System.exit(0);
+        }
+    // CLI run loop
+    public void start() {
+        Scanner scanner = new Scanner(System.in);
+
         while (true) {
-            System.out.print(cli.currentDirectory.getAbsolutePath() + "> ");
-            commandLine = reader.readLine();
-            if ("exit".equalsIgnoreCase(commandLine)) {
-                cli.exit();
-            }
-            cli.executeCommand(commandLine);
+            System.out.print(currentDir + " $ ");
+            String input = scanner.nextLine();
+            executeCommand(input);
         }
     }
 
+    public static void main(String[] args) {
+        CLI cli = new CLI();
+        cli.start();
+    }
 }
-################################################################################################################3
+
+
+
