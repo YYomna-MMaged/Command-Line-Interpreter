@@ -1,19 +1,36 @@
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Scanner;
 
 public class CLI {
 
     Path currentDir;
+    private final Scanner scanner = new Scanner(System.in);
+    private File currentDirectory;
+
+
 
     public CLI()
     {
         currentDir= Paths.get("").toAbsolutePath();// Start in the current directory
+        this.currentDirectory = new File(System.getProperty("user.dir")); // الدليل الحالي يبدأ بالدليل الافتراضي للنظام
+
     }
+    public CLI(File currentDirectory) {
+        this.currentDirectory = currentDirectory;
+    }
+    public void setCurrentDirectory(File directory) {
+        this.currentDirectory = directory;
+    }
+    public File getCurrentDirectory() {
+        return currentDirectory;
+    }
+
+
 
 
     //pwd - Print Working Directory
@@ -105,13 +122,86 @@ public class CLI {
        }
     }
 
+    //Mkdir
+    public void mkdir(String[] directories) {
+        for (String dir : directories) {
+            File directory = new File(currentDirectory, dir);
+            if (!directory.exists()) {
+                if (directory.mkdir()) {
+                    System.out.println("Directory created: " + directory.getPath());
+                } else {
+                    System.out.println("Failed to create directory: " + directory.getPath());
+                }
+            } else {
+                System.out.println("Directory already exists: " + directory.getPath());
+            }
+        }
+    }
+
+    //Rmdir
+    public void rmdir(String dirName) {
+        File directory = new File(currentDirectory, dirName);
+        if (directory.exists() && directory.isDirectory()) {
+            if (directory.delete()) {
+                System.out.println("Directory removed: " + directory.getPath());
+            } else {
+                System.out.println("Failed to remove directory: " + directory.getPath());
+            }
+        } else {
+            System.out.println("Directory not found: " + directory.getPath());
+        }
+    }
+
+    //Touch
+    public void touch(String fileName) {
+        File file = new File(currentDirectory, fileName);
+        try {
+            if (file.createNewFile()) {
+                System.out.println("File created: " + file.getPath());
+            } else {
+                System.out.println("File already exists: " + file.getPath());
+            }
+        } catch (IOException e) {
+            System.out.println("Error creating file: " + file.getPath());
+        }
+    }
+
+    //mv
+    public void mv(String source, String destination) {
+        File sourceFile = new File(currentDirectory, source);
+        File destFile = new File(currentDirectory, destination);
+
+        if (!sourceFile.exists()) {
+            System.out.println("Source not found: " + sourceFile.getPath());
+            return;
+        }
+
+        // إذا كانت الوجهة هي مجلد، فنقوم بإنشاء مسار جديد داخل هذا المجلد للملف أو المجلد المنقول
+        if (destFile.exists() && destFile.isDirectory()) {
+            destFile = new File(destFile, sourceFile.getName());
+        }
+
+        if (sourceFile.renameTo(destFile)) {
+            System.out.println("Moved/Renamed " + sourceFile.getPath() + " to " + destFile.getPath());
+        } else {
+            System.out.println("Failed to move/rename " + sourceFile.getPath());
+        }
+    }
+
+
+
+
+
+
 
     public void executeCommand(String command) {
         //command.trim() removes any leading or trailing whitespace from the command string.
         //split("\\s+") splits the command string into an array of substrings using one or more spaces as the delimiter.
         String[] cmd = command.trim().split("\\s+");
+        String[] parts = cmd;
         String mainCommand=cmd[0];
         String[] args = Arrays.copyOfRange(cmd, 1, cmd.length);
+
 
         switch (mainCommand) {
             case "pwd":
@@ -140,6 +230,38 @@ public class CLI {
                 } else {
                     System.out.println("ls-r: invalid arguments");
                 }
+            case "mkdir":
+                if (parts.length > 1) {
+                    String[] directories = new String[parts.length - 1];
+                    System.arraycopy(parts, 1, directories, 0, parts.length - 1);
+                    mkdir(directories);
+                } else {
+                    System.out.println("Usage: mkdir <dir1> <dir2> ...");
+                }
+                break;
+
+            case "rmdir":
+                if (parts.length == 2) {
+                    rmdir(parts[1]);
+                } else {
+                    System.out.println("Usage: rmdir <directory>");
+                }
+                break;
+
+            case "touch":
+                if (parts.length == 2) {
+                    touch(parts[1]);
+                } else {
+                    System.out.println("Usage: touch <filename>");
+                }
+                break;
+
+            case "mv":
+                if (parts.length == 3) {
+                    mv(parts[1], parts[2]);
+                } else {
+                    System.out.println("Usage: mv <source> <destination>");
+                }
                 break;
             case "help":
                 help(); // Display help message
@@ -151,6 +273,7 @@ public class CLI {
                 System.out.println("Unknown command: " + mainCommand);
         }
     }
+
 
 
         public static void help () {
