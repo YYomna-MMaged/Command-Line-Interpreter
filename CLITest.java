@@ -2,15 +2,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.jupiter.api.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.PrintStream;
+//import java.io.ByteArrayOutputStream;
+import java.io.*;
+//import java.io.PrintStream;
 import java.nio.file.*;
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.InputStream;
 import java.util.Scanner;
 
 //import static org.junit.Assert.assertFalse;
@@ -24,6 +22,9 @@ public class CLITest {
     private File testDirectory;
     private final InputStream systemIn = System.in;
     private final Scanner scanner = new Scanner(System.in);
+    private CLI interpreter;
+    private Path tempFile;
+
 
 
 
@@ -132,7 +133,7 @@ public class CLITest {
         //if tempDir is /home/user/temp, then tempDir.resolve("file1.txt") will return a Path representing /home/user/temp/file1.txt.
         Files.createFile(tempDir.resolve("file1.txt"));
         Files.createFile(tempDir.resolve("file2.txt"));
-       // Files.createFile(tempDir.resolve(".hiddenfile"));
+        // Files.createFile(tempDir.resolve(".hiddenfile"));
         // Capture the output of the lsR() method
 //        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Redirect System.out (standard output) to the ByteArrayOutputStream
@@ -144,86 +145,192 @@ public class CLITest {
 //        assertEquals("file2.txt", lines[0].trim());  // First file should be file2.txt
 //        assertEquals("file1.txt", lines[1].trim());  // Second file should be file1.txt
     }
+    @Test
+    void testMkdir() {
+        cli.mkdir(new String[]{"newDir"});
+        File createdDir = new File(testDirectory, "newDir");
+        assertTrue(createdDir.exists() && createdDir.isDirectory(), "Directory should be created");
+    }
 
     @Test
-    public void testDynamicMkdir()
-    {
-        System.out.print("Enter directory names for mkdir test (space-separated): ");
-        String userDirs = scanner.nextLine();
-        String[] directories = userDirs.split("\\s+");
+    void testRmdir() {
+        File dirToDelete = new File(testDirectory, "dirToDelete");
+        dirToDelete.mkdir();
+        cli.rmdir("dirToDelete");
+        assertFalse(dirToDelete.exists(), "Directory should be deleted");
+    }
+    @Test
+    void testTouch() {
+        cli.touch("newFile.txt");
+        File createdFile = new File(testDirectory, "newFile.txt");
+        assertTrue(createdFile.exists() && createdFile.isFile(), "File should be created");
+    }
 
-        cli.mkdir(directories);
+    @Test
+    void testMv() {
+        File sourceFile = new File(testDirectory, "sourceFile.txt");
+        File destinationFile = new File(testDirectory, "destinationFile.txt");
 
-        for (String dir : directories)
-        {
-            assertTrue(new File(testDirectory, dir).exists());
-            deleteFileOrDirectory(new File(testDirectory, dir).getPath());
+        try {
+            assertTrue(sourceFile.createNewFile(), "Source file should be created");
+            cli.mv("sourceFile.txt", "destinationFile.txt");
+            assertTrue(destinationFile.exists(), "File should be moved/renamed to destination");
+            assertFalse(sourceFile.exists(), "Source file should no longer exist");
+        } catch (IOException e) {
+            fail("IOException occurred during testMv");
+  }
+    }
+
+    @BeforeEach
+    void setUpp() throws IOException {
+        interpreter = new CLI();
+        tempFile = Files.createTempFile("testfile", ".txt");
+    }
+
+    @Test
+    void testHelp() {
+        // Ensure that calling help() doesn't cause an error.
+        assertDoesNotThrow(CLI::help);
+    }
+
+    @Test
+    void testReadFile() throws IOException {
+        String content = "apple banana\nbanana apple";
+        Files.writeString(tempFile, content);
+
+        List<String> expected = Arrays.asList("apple", "banana", "banana", "apple");
+        List<String> result = CLI.readFile(tempFile.toString());
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testSortFile() throws IOException {
+        String content = "orange\napple\nbanana";
+        Files.writeString(tempFile, content);
+
+        List<String> sortedResult = interpreter.sortFile(tempFile.toString());
+
+        List<String> expected = Arrays.asList("apple", "banana", "orange");
+        assertEquals(expected, sortedResult);
+    }
+
+    @Test
+    void testSortList() throws IOException {
+        List<String> input = Arrays.asList( "orange", "apple", "banana");
+        List<String> expected = Arrays.asList("apple", "banana", "orange");
+
+        List<String> result = interpreter.sortList(input);
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testUniq() {
+        List<String> input = Arrays.asList("apple", "apple", "banana", "banana", "apple");
+        List<String> expected = Arrays.asList("apple", "banana", "apple");
+
+        List<String> result = interpreter.uniq(input);
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testPipeSortAndUniq() throws IOException {
+        String content = "banana\napple\napple\norange\nbanana";
+        Files.writeString(tempFile, content);
+
+        interpreter.execute("sort " + tempFile.toString() + " | uniq");
+
+        List<String> expected = Arrays.asList("apple", "banana", "orange");
+
+        List<String> result = interpreter.uniq(interpreter.sortFile(tempFile.toString()));
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testRunpipe_with_inputSortAndUniq() throws IOException {
+        List<String> input = Arrays.asList("orange", "banana", "apple", "apple", "banana");
+
+        List<String> sortedList = interpreter.sortList(input);
+
+        List<String> uniqResult = interpreter.uniq(sortedList);
+
+        List<String> expected = Arrays.asList("apple", "banana", "orange");
+
+        assertEquals(expected, uniqResult);
+    }
+
+    @Test
+    void testCatCommand() throws IOException {
+        String content = "hello world\nthis is a test file";
+        Files.writeString(tempFile, content);
+
+        List<String> expected = Arrays.asList("hello world", "this is a test file");
+        List<String> result = CLI.cat(tempFile.toString());
+
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void testPipeCatSortAndUniq() throws IOException {
+        String content = "orange\napple\nbanana\napple\norange";
+        Files.writeString(tempFile, content);
+
+        interpreter.execute("cat " + tempFile.toString() + " | sort | uniq");
+
+        List<String> expected = Arrays.asList("apple", "banana", "orange");
+
+        List<String> result = interpreter.uniq(interpreter.sortFile(tempFile.toString()));
+
+        assertEquals(expected, result);
+    }
+    @Test
+    // testing the rm method
+    public void test_rm()throws Exception{
+        File testFile =new File(cli.getCurrentDirectory(), "testFile.txt");
+        testFile.createNewFile();
+
+        boolean testing = cli.rm("testFile.txt");
+
+        //Assert the file was deleted ?
+        assertTrue(testing, "File sould be deleted"); //->Confirms that rm returned true, meaning it believed the file was deleted.
+        assertFalse(testFile.exists(), "File shouldn't exist now");
+    }
+    // testing the cat function
+    @Test
+    public void test_cat() throws IOException{
+        File testFile = new File(cli.getCurrentDirectory(), "testFile.txt");
+        try(FileWriter writer = new FileWriter(testFile)){
+            writer.write("For you a thousands times over!");
         }
+        String content = cli.Cat("testFile.txt");
+        assertEquals("For you a thousands times over!", content,"they should be the same");
     }
-
+    //testing the override function
     @Test
-    public void testDynamicRmdir()
-    {
-        System.out.print("Enter a directory name for rmdir test: ");
-        String dirName = scanner.nextLine();
-        File directory = new File(testDirectory, dirName);
-        directory.mkdir();
+    public void testWriteToFile(){
+        String testingWToF = cli.writeToFile("newFile.txt","A beautiful thing is never prtfect");
 
-        cli.rmdir(dirName);
-
-        assertFalse(directory.exists());
+        String content = cli.Cat("newFile.txt");
+        assertEquals("file written successfully",testingWToF,"succeed");//->This assertion checks the return value of the writeToFile method.
+        assertEquals("A beautiful thing is never prtfect", content,"they should match");
     }
-
-
+    //testing appending to a file
     @Test
-    public void testDynamicTouch()
-    {
-        System.out.print("Enter a filename for touch test: ");
-        String fileName = scanner.nextLine();
-
-        cli.touch(fileName);
-
-        assertTrue(new File(testDirectory, fileName).exists());
-        deleteFileOrDirectory(new File(testDirectory, fileName).getPath());
+    public void testAppendTFile()throws IOException{
+        //creating file with initial content
+        File testFile = new File(cli.getCurrentDirectory(), "initial_content.txt");
+        try(FileWriter writer = new FileWriter(testFile)){
+            writer.write("small steps, ");
+        }
+        String result = cli.appendToFile("initial_content.txt","every day");
+        String content = cli.Cat("initial_content.txt");
+        assertEquals("content was appended successfully",result,"succeed");
+        assertEquals("small steps, every day",content,"they should be equal");
     }
 
-    @Test
-    public void testDynamicMv() {
-        // الحالة الأولى: إعادة تسمية ملف
-        System.out.print("Enter a filename for mv test (create then rename): ");
-        String fileName = scanner.nextLine();
-        cli.touch(fileName); // إنشاء الملف للاختبار
-
-        System.out.print("Enter the new filename (for rename): ");
-        String newFileName = scanner.nextLine();
-
-        cli.mv(fileName, newFileName); // إعادة التسمية
-
-        // التحقق من أن إعادة التسمية قد تمت بنجاح
-        assertTrue(new File(testDirectory, newFileName).exists());
-        assertFalse(new File(testDirectory, fileName).exists());
-
-        // تنظيف الملف بعد إعادة التسمية
-        deleteFileOrDirectory(new File(testDirectory, newFileName).getPath());
-
-        // الحالة الثانية: نقل الملف إلى مجلد آخر
-        System.out.print("Enter a directory name for mv test (destination directory): ");
-        String dirName = scanner.nextLine();
-        File destinationDir = new File(testDirectory, dirName);
-        destinationDir.mkdir(); // إنشاء المجلد الوجهة للاختبار
-
-        cli.touch(fileName); // إعادة إنشاء الملف للاختبار
-
-        cli.mv(fileName, dirName); // نقل الملف إلى المجلد الوجهة
-
-        // التحقق من أن الملف تم نقله إلى داخل المجلد الوجهة
-        assertTrue(new File(destinationDir, fileName).exists());
-        assertFalse(new File(testDirectory, fileName).exists());
-
-        // تنظيف الملفات والمجلدات بعد الاختبار
-        deleteFileOrDirectory(new File(destinationDir, fileName).getPath());
-        deleteFileOrDirectory(destinationDir.getPath());
-    }
 
 
 }

@@ -1,10 +1,10 @@
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Scanner;
+import java.util.*;
 
 public class CLI {
 
@@ -17,7 +17,7 @@ public class CLI {
     public CLI()
     {
         currentDir= Paths.get("").toAbsolutePath();// Start in the current directory
-        this.currentDirectory = new File(System.getProperty("user.dir")); // الدليل الحالي يبدأ بالدليل الافتراضي للنظام
+        this.currentDirectory = new File(System.getProperty("user.dir"));
 
     }
     public CLI(File currentDirectory) {
@@ -85,10 +85,10 @@ public class CLI {
 
     }
 
-   // ls-a -List All Directory Contents (including hidden files)
+    // ls-a -List All Directory Contents (including hidden files)
     // Lists all files in the current directory, including hidden files, in alphabetical order.
-  public void lsA()
-   {
+    public void lsA()
+    {
         File Dir=currentDir.toFile();
         String[] files=Dir.list();
 
@@ -100,26 +100,26 @@ public class CLI {
         for (String file : files) {
             System.out.println(file); // Include hidden files
         }
-   }
+    }
 
-   //ls-r - List Directory Contents in Reverse Order.]
+    //ls-r - List Directory Contents in Reverse Order.]
     //Lists the non-hidden files in the current directory in reverse alphabetical order.
     public void lsR()
     {
-       File Dir=currentDir.toFile();
-       String[] files=Dir.list();
+        File Dir=currentDir.toFile();
+        String[] files=Dir.list();
 
-       if(files==null){
-           System.out.println("lsR:missing Files"+currentDir);
-           return;
-       }
+        if(files==null){
+            System.out.println("lsR:missing Files"+currentDir);
+            return;
+        }
 
-       Arrays.sort(files, Collections.reverseOrder());
-       for (String file : files) {
-           if(!file.startsWith(".")){ // Exclude hidden files
-               System.out.println(file);
-           }
-       }
+        Arrays.sort(files, Collections.reverseOrder());
+        for (String file : files) {
+            if(!file.startsWith(".")){ // Exclude hidden files
+                System.out.println(file);
+            }
+        }
     }
 
     //Mkdir
@@ -176,7 +176,6 @@ public class CLI {
             return;
         }
 
-        // إذا كانت الوجهة هي مجلد، فنقوم بإنشاء مسار جديد داخل هذا المجلد للملف أو المجلد المنقول
         if (destFile.exists() && destFile.isDirectory()) {
             destFile = new File(destFile, sourceFile.getName());
         }
@@ -188,117 +187,324 @@ public class CLI {
         }
     }
 
+    public static List<String> readFile(String filePath) throws IOException {
+        List<String> words = new ArrayList<>();
 
+        // Read all lines from the file
+        List<String> lines = Files.readAllLines(Paths.get(filePath));
 
+        // Process each line
+        for (String line : lines) {
+            // Split each line by one or more spaces
+            String[] tokens = line.split("\\s+");
 
+            // Add each word to the words list
+            for (String token : tokens) {
+                words.add(token);
+            }
+        }
+        return words;
+    }
 
+    public void execute(String command) throws IOException {
+        if (command.contains("|")){
+            String[] commandParts = command.split("\\|");
+
+            pipe(commandParts);
+        }
+        else {
+            if (command.equals("help")) {
+                help();
+            }
+            else if (command.startsWith("sort")) {
+                String[] parts = command.split(" ");
+
+                List<String> sorted = sortFile(parts[1]);
+                for (String part : sorted) {
+                    System.out.println(part);
+                }
+            }
+            else if (command.startsWith("cat")) {
+                String[] parts = command.split(" ");
+
+                List<String> lines = cat(parts[1]);
+                for (String part : lines) {
+                    System.out.println(part);
+                }
+            }
+            else if (command.equals("exit")) {
+                exit();
+            }
+            else {
+                throw new IllegalArgumentException("Unrecognized command: " + command);
+            }
+        }
+
+    }
+    public void pipe(String[] commands) throws IOException {
+        List<String> out_in = null;
+
+        for (String command : commands) {
+            command = command.trim();
+
+            if(out_in == null){
+                out_in = runpipe(command);
+            }
+            else {
+                out_in = runpipe_with_input(command, out_in);
+            }
+        }
+
+        for (String line : out_in) {
+            System.out.println(line);
+        }
+    }
+
+    private List<String> runpipe(String command) throws IOException {
+        String[] parts = command.split(" ");
+        ArrayList<String> cleanParts = new ArrayList<>();
+        for (String part : parts){
+            if (!Objects.equals(part, "")){
+                cleanParts.add(part);
+            }
+        }
+
+        String[] newparts = cleanParts.toArray(new String[cleanParts.size()]);
+        switch (newparts[0]){
+            case "sort":
+                return sortFile(newparts[1]);
+            case "uniq":
+                return uniq(sortFile(newparts[1]));
+            case "cat":
+                return cat(newparts[1]);
+            default:
+                throw new IllegalArgumentException("Unrecognized command: " + command);
+        }
+    }
+
+    private List<String> runpipe_with_input(String command, List<String> input){
+        String[] parts = command.split(" ");
+
+        switch (command){
+            case "sort":
+                return sortList(input);
+            case "uniq":
+                return uniq(input);
+            default:
+                throw new RuntimeException("Unrecognized command: " + command);
+        }
+
+    }
+
+    List<String> sortFile(String filename) throws IOException {
+        List<String> lines = readFile(filename);
+        Collections.sort(lines);
+
+        return lines;
+    }
+
+    public List<String> sortList(List<String> lines){
+        Collections.sort(lines);
+        return lines;
+    }
+
+    List<String> uniq(List<String> list){
+        List<String> uniq = new ArrayList<>();
+        String prev_line = null;
+
+        for (String line : list){
+            if (!line.equals(prev_line)){
+                uniq.add(line);
+                prev_line = line;
+            }
+        }
+        return uniq;
+    }
+    public static List<String> cat(String filename) throws IOException {
+        return Files.readAllLines(Paths.get(filename));
+    }
+    //To Delete a File
+    public boolean rm (String file_name){
+        File file = new File(currentDirectory,file_name);
+        return file.exists() && file.isFile() && file.delete();
+        //Deleting Files: file.delete()
+        // returns true if the file
+        // was successfully deleted and false if not.
+    }
+    //cat for reading file content
+    public String Cat (String file_name){
+        File file = new File(currentDirectory,file_name);
+        if (file.exists() && file.isFile()){
+            try{
+                return Files.readString(Path.of(file.getPath()));
+            } catch (IOException e) {
+                return "Error reading the File: " + e.getMessage();
+            }
+        }else{
+            return "File not found or is a directory";
+        }
+    }
+    // '>' write to a File (overwrite)
+    public String writeToFile(String file_name, String content){
+        File file = new File(currentDirectory, file_name);
+        try(FileWriter writer = new FileWriter(file, false)){
+            //set append to false->overwrite mode
+            writer.write(content);
+            //i.e. ->If the file doesn’t exist,
+            // FileWriter creates it.
+            // If it exists, it overwrites
+            // the contents.
+            //try-with-resources,
+            // you avoid common bugs by letting Java handle closing
+            //We declare writer inside the parentheses
+            // after try. Any resource declared here (like writer) will be automatically closed once the try block finishes.
+            return "file written successfully";
+        }catch(IOException e){
+            return "error while writting to the file"+e.getMessage();
+        }
+    }
+    //'>>' Append to a File
+    public String appendToFile (String file_name, String content){
+        File file = new File(currentDirectory, file_name);
+        try(FileWriter writer = new FileWriter(file, true)){
+            writer.write(content);
+            //FileWriter creates the file if doesn't exist
+            return "content was appended successfully";
+        }catch (IOException e){
+            return "error while appending to the file: "+ e.getMessage();
+        }
+    }
 
 
     public void executeCommand(String command) {
-        //command.trim() removes any leading or trailing whitespace from the command string.
-        //split("\\s+") splits the command string into an array of substrings using one or more spaces as the delimiter.
         String[] cmd = command.trim().split("\\s+");
-        String[] parts = cmd;
-        String mainCommand=cmd[0];
+        String mainCommand = cmd[0];
         String[] args = Arrays.copyOfRange(cmd, 1, cmd.length);
 
-
-        switch (mainCommand) {
-            case "pwd":
-                pwd();
-                break;
-            case "cd":
-                cd(args);
-                break;
-            case "ls":
-                if (args.length == 0) {
-                    ls();
-                } else {
-                    System.out.println("ls: invalid arguments");
-                }
-                break;
-            case "ls-a":
-                if (args.length == 0) {
-                    lsA();
-                } else {
-                    System.out.println("ls-a: invalid arguments");
-                }
-                break;
-            case "ls-r":
-                if (args.length == 0) {
-                    lsR();
-                } else {
-                    System.out.println("ls-r: invalid arguments");
-                }
-            case "mkdir":
-                if (parts.length > 1) {
-                    String[] directories = new String[parts.length - 1];
-                    System.arraycopy(parts, 1, directories, 0, parts.length - 1);
-                    mkdir(directories);
-                } else {
-                    System.out.println("Usage: mkdir <dir1> <dir2> ...");
-                }
-                break;
-
-            case "rmdir":
-                if (parts.length == 2) {
-                    rmdir(parts[1]);
-                } else {
-                    System.out.println("Usage: rmdir <directory>");
-                }
-                break;
-
-            case "touch":
-                if (parts.length == 2) {
-                    touch(parts[1]);
-                } else {
-                    System.out.println("Usage: touch <filename>");
-                }
-                break;
-
-            case "mv":
-                if (parts.length == 3) {
-                    mv(parts[1], parts[2]);
-                } else {
-                    System.out.println("Usage: mv <source> <destination>");
-                }
-                break;
-            case "help":
-                help(); // Display help message
-                break;
-            case "exit":
-                exit(); // Exit the CLI
-                break;
-            default:
-                System.out.println("Unknown command: " + mainCommand);
+        try {
+            switch (mainCommand) {
+                case "pwd":
+                    pwd();
+                    break;
+                case "cd":
+                    cd(args);
+                    break;
+                case "ls":
+                    if (args.length == 0) {
+                        ls();
+                    } else {
+                        System.out.println("ls: invalid arguments");
+                    }
+                    break;
+                case "ls-a":
+                    if (args.length == 0) {
+                        lsA();
+                    } else {
+                        System.out.println("ls-a: invalid arguments");
+                    }
+                    break;
+                case "ls-r":
+                    if (args.length == 0) {
+                        lsR();
+                    } else {
+                        System.out.println("ls-r: invalid arguments");
+                    }
+                    break;
+                case "mkdir":
+                    mkdir(args);
+                    break;
+                case "rmdir":
+                    if (args.length == 1) {
+                        rmdir(args[0]);
+                    } else {
+                        System.out.println("Usage: rmdir <directory>");
+                    }
+                    break;
+                case "touch":
+                    if (args.length == 1) {
+                        touch(args[0]);
+                    } else {
+                        System.out.println("Usage: touch <filename>");
+                    }
+                    break;
+                case "mv":
+                    if (args.length == 2) {
+                        mv(args[0], args[1]);
+                    } else {
+                        System.out.println("Usage: mv <source> <destination>");
+                    }
+                    break;
+                case "Cat":
+                    if (args.length == 1) {
+                        List<String> lines = cat(args[0]);
+                        lines.forEach(System.out::println);
+                    } else {
+                        System.out.println("Usage: cat <filename>");
+                    }
+                    break;
+                case ">":
+                    if (args.length == 2) {
+                        System.out.println(writeToFile(args[0], args[1]));
+                    } else {
+                        System.out.println("Usage: > <filename> <content>");
+                    }
+                    break;
+                case ">>":
+                    if (args.length == 2) {
+                        System.out.println(appendToFile(args[0], args[1]));
+                    } else {
+                        System.out.println("Usage: >> <filename> <content>");
+                    }
+                    break;
+                case "rm":
+                    if (args.length == 1) {
+                        boolean result = rm(args[0]);
+                        System.out.println(result ? "File deleted successfully" : "File deletion failed or file not found.");
+                    } else {
+                        System.out.println("Usage: rm <filename>");
+                    }
+                    break;
+                case "help":
+                    help();
+                    break;
+                case "exit":
+                    exit();
+                    break;
+                default:
+                    execute(command);
+            }
+        } catch (IOException e) {
+            System.out.println("An error occurred: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
         }
     }
 
 
 
-        public static void help () {
-            // Display list of available commands
-            System.out.println("Available commands:");
-            System.out.println("    pwd           | - Print the current directory.");
-            System.out.println("    cd <dir>      | - Change directory to <dir>.");
-            System.out.println("    mkdir <dir>   | - Create a new directory named <dir>.");
-            System.out.println("    rmdir <dir>   | - Remove the directory named <dir>.");
-            System.out.println("    ls -a -r      | - List files in the current directory (-a for all files and -r for reverse).");
-            System.out.println("    touch <file>  | - Create a file named <file>.");
-            System.out.println("    mv <src> <dst>| - Move or rename file from <src> to <dst>.");
-            System.out.println("    rm <file>     | - Remove file from <file>.");
-            System.out.println("    cat <file>    | - Display the contents of a <file>.");
-            System.out.println("    > <file>      | - Redirect output to <file> (overwrite).");
-            System.out.println("    >> <file>     | - Append output to <file>.");
-            System.out.println("    |             | - Pipe output of one file to another.");
-            System.out.println("    exit          | - Exit the CLI.");
-            System.out.println("    help          | - Display this help message.");
-        }
-        public static void exit () {
-            // Exit the Command Line Interpreter
-            System.out.println("Exiting the CLI, see you later :)");
-            System.exit(0);
-        }
+    public static void help () {
+        // Display list of available commands
+        System.out.println("Available commands:");
+        System.out.println("    pwd           | - Print the current directory.");
+        System.out.println("    cd <dir>      | - Change directory to <dir>.");
+        System.out.println("    mkdir <dir>   | - Create a new directory named <dir>.");
+        System.out.println("    rmdir <dir>   | - Remove the directory named <dir>.");
+        System.out.println("    ls -a -r      | - List files in the current directory (-a for all files and -r for reverse).");
+        System.out.println("    touch <file>  | - Create a file named <file>.");
+        System.out.println("    mv <src> <dst>| - Move or rename file from <src> to <dst>.");
+        System.out.println("    rm <file>     | - Remove file from <file>.");
+        System.out.println("    cat <file>    | - Display the contents of a <file>.");
+        System.out.println("    > <file>      | - Redirect output to <file> (overwrite).");
+        System.out.println("    >> <file>     | - Append output to <file>.");
+        System.out.println("    |             | - Pipe output of one file to another.");
+        System.out.println("    exit          | - Exit the CLI.");
+        System.out.println("    help          | - Display this help message.");
+    }
+    public static void exit () {
+        // Exit the Command Line Interpreter
+        System.out.println("Exiting the CLI, see you later :)");
+        System.exit(0);
+    }
     // CLI run loop
     public void start() {
         Scanner scanner = new Scanner(System.in);
