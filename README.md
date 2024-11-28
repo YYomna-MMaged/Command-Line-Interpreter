@@ -13,7 +13,7 @@ The Command Line Interpreter (CLI) is a Java-based tool designed to mimic shell 
 - **`ls-a`**: Lists all files (including hidden).
 - **`ls-r`**: Lists non-hidden files in reverse order.
 - **`mkdir <dir> <dir1>`**: Creates one or more directories named `<dir>`, `<dir1>`.
-- **`rmdir <dir> <dir1>`**: Removes one or more empty directory.
+- **`rmdir <dir> <dir1>`**: Removes one or more empty directories.
 - **`touch <file>`**: Creates an empty file.
 - **`rm <file>`**: Deletes a file.
 - **`mv <src> <dst>`**: Moves or renames a file.
