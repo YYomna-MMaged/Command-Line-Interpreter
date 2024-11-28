@@ -28,15 +28,6 @@ The Command Line Interpreter (CLI) is a Java-based tool designed to mimic shell 
 ### Advanced Features
 - **Piping (`|`)**: Combines commands for advanced functionality.
 
----
 
-## How to Run
-### Prerequisites
-- Install Java Development Kit (JDK) 8 or higher.
-- Use an IDE (e.g., IntelliJ, Eclipse) or terminal.
-
-### Steps to Run
-1. Clone the repository:
-   ```sh
    git clone https://github.com/your-username/cli-project.git
    cd cli-project
